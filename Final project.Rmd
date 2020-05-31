@@ -1,0 +1,111 @@
+---
+title: "final project"
+Author: "Jie Zhang"
+output: html_document
+---
+
+```{r}
+library(caret)
+library(randomForest)
+library(corrplot)
+library(readr)
+```
+
+
+##load the data from coursera website
+```{r}
+Trainset <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv")
+Testset <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv")
+```
+
+##cleaning data
+##remove NA from dataset
+##Identify the parameter columns that are almost empty and remove them from dataset.
+```{r}
+nacol <- colSums(is.na(Trainset))<nrow(Trainset)*0.95
+Trainset <- Trainset[,nacol==TRUE]
+dim(Trainset)
+```
+
+
+##remove zero variance data
+##Identify the parameters that are similar for every sample which have no reference value and remove them from dataset.
+```{r}
+nzv <- nearZeroVar(Trainset)
+Trainset <- Trainset[,-nzv]
+dim(Trainset)
+```
+
+
+##remove identification only variables
+##Remove the parameters for identification and are not useful in this analysis from the dataset.
+```{r}
+Trainset<-Trainset[,-(1:6)]
+dim(Trainset)
+```
+
+
+##splitting training set into two
+##70% of the trainset is allocated to myTraining and 30% of it is allocated to myTesting
+##As there are no “classe” column which is the result of prediction in the provided testing data set, it is necessary to split the training dataset into 2 parts to test the out of sample error of the prediction.
+```{r}
+set.seed(1221)
+new_Train <- createDataPartition(Trainset$classe, p=0.7, list=FALSE)
+myTraining <- Trainset[new_Train, ]
+myTesting <- Trainset[-new_Train, ]
+
+dim(myTraining)
+dim(myTesting)
+```
+
+##correlation analysis
+##To avoid the bias coming from related or causal parameters, correlation analysis is implemented to test whether there exist parameters that are highly correlated to each other.
+```{r}
+corMatrix <- cor(myTraining[, -53])
+corrplot(corMatrix)
+```
+
+
+##Prediction with models
+##Prediction with classification trees
+```{r}
+set.seed(1221)
+modfit_rpart<-train(classe~.,method="rpart",data=myTraining)
+print(modfit_rpart)
+plot(modfit_rpart)
+```
+
+
+##from the output, the accuracy of classification tree is 0.4933, thus the out-of-sample error is 0.5067
+```{r}
+predict_rpart <- predict(modfit_rpart, newdata=myTesting)
+cm_rpart <- confusionMatrix(predict_rpart, myTesting$classe)
+print(cm_rpart)
+plot(cm_rpart$table,col = cm_rpart$byClass)
+```
+
+##Prediction with Random Forest
+```{r}
+set.seed(1221)
+modfit_RF <- train(classe~., method="rf",data=myTraining, trcontrol=trainControl(method="cv"),number=3)
+print(modfit_RF)
+plot(modfit_RF)
+```
+
+
+##from the output, the accuracy of RF is 0.992, thus the out-of-sample error is 0.008
+```{r}
+predict_RF<- predict(modfit_RF, newdata=myTesting)
+cm_RF <- confusionMatrix(predict_RF, myTesting$classe)
+print(cm_RF)
+plot(cm_RF$table,col = cm_RF$byClass)
+```
+
+
+##Comparing the accuracy, RF model is quite sarisfying while Classification tree is not, there is no point of combine these two
+
+##Prediction of the testing set based on RF model
+```{r}
+predict_testset<- predict(modfit_RF, newdata=Testset)
+predict_testset
+```
